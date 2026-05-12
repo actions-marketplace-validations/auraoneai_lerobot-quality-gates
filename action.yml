@@ -1,6 +1,9 @@
 name: LeRobot Quality Gates
 description: Check LeRobot-style robotics datasets for training-readiness issues.
 author: AuraOne
+branding:
+  icon: check-circle
+  color: green
 inputs:
   path:
     description: Dataset path.
