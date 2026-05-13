@@ -4,6 +4,9 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 
 @dataclass(frozen=True)
@@ -27,6 +30,8 @@ class DatasetInfo:
     info: dict[str, Any]
     episodes: list[Episode]
     readme: str
+    source: str = "local"
+    remote: bool = False
 
 
 def load_dataset(path: str | Path) -> DatasetInfo:
@@ -37,6 +42,24 @@ def load_dataset(path: str | Path) -> DatasetInfo:
     episodes = [_episode_from_dict(item) for item in episodes_raw if isinstance(item, dict)]
     readme = _read_optional_text(root / "README.md")
     return DatasetInfo(root=root, info=info if isinstance(info, dict) else {}, episodes=episodes, readme=readme)
+
+
+def load_hf_dataset(repo_id: str, fetcher: Any | None = None) -> DatasetInfo:
+    """Load lightweight Hugging Face dataset metadata without downloading media files."""
+    fetch = fetcher or _fetch_hf_text
+    info = _loads_json(fetch(repo_id, "meta/info.json"))
+    episodes_payload = _loads_json(fetch(repo_id, "meta/episodes.json"))
+    episodes_raw = episodes_payload.get("episodes", episodes_payload if isinstance(episodes_payload, list) else [])
+    episodes = [_episode_from_dict(item) for item in episodes_raw if isinstance(item, dict)]
+    readme = fetch(repo_id, "README.md")
+    return DatasetInfo(
+        root=Path(".").resolve(),
+        info=info if isinstance(info, dict) else {},
+        episodes=episodes,
+        readme=readme,
+        source=f"hf://{repo_id}",
+        remote=True,
+    )
 
 
 def _episode_from_dict(item: dict[str, Any]) -> Episode:
@@ -62,10 +85,29 @@ def _read_json(path: Path) -> Any:
         return {}
 
 
+def _loads_json(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+
+
 def _read_optional_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf8")
     except OSError:
+        return ""
+
+
+def _fetch_hf_text(repo_id: str, filename: str) -> str:
+    encoded_repo = quote(repo_id, safe="")
+    encoded_file = "/".join(quote(part, safe="") for part in filename.split("/"))
+    url = f"https://huggingface.co/datasets/{encoded_repo}/resolve/main/{encoded_file}"
+    request = Request(url, headers={"User-Agent": "lerobot-quality-gates/0.1"})
+    try:
+        with urlopen(request, timeout=10) as response:
+            return response.read().decode("utf8")
+    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError):
         return ""
 
 

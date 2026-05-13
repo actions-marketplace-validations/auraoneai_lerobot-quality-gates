@@ -35,6 +35,8 @@ class QualityReport:
             counts[finding.severity] = counts.get(finding.severity, 0) + 1
         return {
             "root": str(self.dataset.root),
+            "source": self.dataset.source,
+            "remote": self.dataset.remote,
             "finding_count": len(self.findings),
             "counts": counts,
             "episode_count": len(self.dataset.episodes),
@@ -43,7 +45,10 @@ class QualityReport:
 
 
 def run_quality_gates(path: str | Path) -> QualityReport:
-    dataset = load_dataset(path)
+    return run_quality_gates_for_dataset(load_dataset(path))
+
+
+def run_quality_gates_for_dataset(dataset: DatasetInfo) -> QualityReport:
     findings: list[Finding] = []
     for check in [
         check_metadata,
@@ -74,7 +79,7 @@ def _markdown(report: QualityReport) -> str:
     lines = [
         "# LeRobot Quality Gates Report",
         "",
-        f"- Dataset: `{report.dataset.root}`",
+        f"- Dataset: `{report.dataset.source if report.dataset.remote else report.dataset.root}`",
         f"- Episodes: `{len(report.dataset.episodes)}`",
         f"- Findings: `{len(report.findings)}`",
         "",

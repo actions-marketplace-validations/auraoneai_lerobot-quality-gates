@@ -8,6 +8,8 @@ def check_videos(dataset: DatasetInfo) -> list[Finding]:
     findings: list[Finding] = []
     for episode in dataset.episodes:
         for camera, rel_path in episode.video_paths.items():
+            if dataset.remote:
+                continue
             path = dataset.root / rel_path
             if not path.exists():
                 findings.append(finding("video", "high", f"Episode {episode.episode_id} video for `{camera}` is missing.", rel_path, "Add the referenced video file or update the manifest."))

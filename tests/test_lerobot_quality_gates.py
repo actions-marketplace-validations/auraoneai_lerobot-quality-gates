@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 from lerobot_quality_gates import run_quality_gates
-from lerobot_quality_gates.report import render_report
+from lerobot_quality_gates.dataset_loader import load_hf_dataset
+from lerobot_quality_gates.report import render_report, run_quality_gates_for_dataset
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,6 +36,54 @@ def test_report_formats():
     assert "AuraOne LeRobot Quality Gates" in card
     badge = json.loads(render_report(report, "badge"))
     assert badge["schemaVersion"] == 1
+
+
+def test_hf_repo_loader_uses_lightweight_metadata_only():
+    def fetcher(repo_id, filename):
+        assert repo_id == "auraone/mock-lerobot"
+        payloads = {
+            "meta/info.json": json.dumps(
+                {
+                    "codebase_version": "v3",
+                    "fps": 30,
+                    "features": {
+                        "action": {"shape": [6]},
+                        "observation.state": {"shape": [6]},
+                        "observation.images.front": {"shape": [480, 640, 3]},
+                    },
+                    "splits": {"train": "0:1"},
+                    "robot_type": "mock_arm",
+                    "total_episodes": 1,
+                }
+            ),
+            "meta/episodes.json": json.dumps(
+                {
+                    "episodes": [
+                        {
+                            "episode_id": 0,
+                            "task": "mock pick",
+                            "frames": 2,
+                            "start_time": 0,
+                            "end_time": 1,
+                            "data_path": "data/chunk-000/episode_000.parquet",
+                            "video_paths": {"observation.images.front": "videos/front.mp4"},
+                            "action_shape": [6],
+                            "state_shape": [6],
+                            "timestamps": [0, 1],
+                        }
+                    ]
+                }
+            ),
+            "README.md": "Mock robot sensor task limitation dataset card.",
+        }
+        return payloads.get(filename, "")
+
+    dataset = load_hf_dataset("auraone/mock-lerobot", fetcher=fetcher)
+    report = run_quality_gates_for_dataset(dataset)
+    payload = report.to_dict()
+    assert payload["source"] == "hf://auraone/mock-lerobot"
+    assert payload["remote"] is True
+    assert "video" not in {finding.gate for finding in report.findings}
 
 
 def test_cli_good_dataset_writes_report(tmp_path):

@@ -34,6 +34,6 @@ def check_episodes(dataset: DatasetInfo) -> list[Finding]:
             findings.append(finding("episodes", "medium", f"{prefix} timestamp count does not match frames.", "meta/episodes.json", "Ensure every frame has one timestamp."))
         if episode.timestamps and any(curr <= prev for prev, curr in zip(episode.timestamps, episode.timestamps[1:])):
             findings.append(finding("episodes", "high", f"{prefix} timestamps are not strictly monotonic.", "meta/episodes.json", "Sort or repair frame timestamps before training."))
-        if episode.data_path and not (dataset.root / episode.data_path).exists():
+        if episode.data_path and not dataset.remote and not (dataset.root / episode.data_path).exists():
             findings.append(finding("episodes", "high", f"{prefix} data file is missing.", episode.data_path, "Add the referenced data shard or update the manifest."))
     return findings

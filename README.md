@@ -12,7 +12,10 @@ python -m venv .venv
 pip install lerobot-quality-gates
 lerobot-quality-gates check examples/mock_lerobot_v3_good --out report.md
 lerobot-quality-gates check examples/mock_lerobot_v3_bad --format json --fail-on medium
+lerobot-quality-gates check --hf-repo owner/dataset-name --format hf-card --out QA.md
 ```
+
+`--hf-repo` fetches only lightweight repository files such as `README.md`, `meta/info.json`, and `meta/episodes.json`; it does not download videos or full robot data shards.
 
 ## What It Checks
 
